@@ -84,37 +84,43 @@ class DatabaseManager:
                     ("org_default", "Enterprise Legal Corp", "enterpriselegal.com")
                 )
                 
-                roles = [
-                    ("role_admin", "Admin", "Full platform administration and access control"),
-                    ("role_legal", "Legal Professional", "Legal review, compliance audit, and brief generation"),
-                    ("role_user", "End User", "Standard document upload, simplification, and Q&A"),
-                    ("role_auditor", "Auditor", "Read-only access to audit logs and security compliance reports")
-                ]
-                for rid, rname, rdesc in roles:
-                    await db.execute(
-                        "INSERT OR IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)",
-                        (rid, rname, rdesc)
-                    )
-
-                seed_password_hash = _hash_seed_password("Admin@123456")
+            roles = [
+                ("role_admin", "Admin", "Full platform administration and access control"),
+                ("role_legal", "Legal Professional", "Legal review, compliance audit, and brief generation"),
+                ("role_user", "End User", "Standard document upload, simplification, and Q&A"),
+                ("role_auditor", "Auditor", "Read-only access to audit logs and security compliance reports")
+            ]
+            for rid, rname, rdesc in roles:
                 await db.execute(
-                    """
-                    INSERT OR IGNORE INTO users (id, organization_id, role_id, email, hashed_password, full_name, mfa_enabled)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    ("user_admin", "org_default", "role_admin", "admin@legalease.ai", seed_password_hash, "Enterprise Admin", 0)
+                    "INSERT OR IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)",
+                    (rid, rname, rdesc)
                 )
 
-                await db.execute(
-                    """
-                    INSERT OR IGNORE INTO users (id, organization_id, role_id, email, hashed_password, full_name, mfa_enabled)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    ("user_counsel", "org_default", "role_legal", "counsel@legalease.ai", seed_password_hash, "General Counsel", 0)
-                )
+            seed_password_hash = _hash_seed_password("Admin@123456")
+            
+            # Upsert admin user
+            await db.execute(
+                """
+                INSERT INTO users (id, organization_id, role_id, email, hashed_password, full_name, mfa_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(email) DO UPDATE SET hashed_password = excluded.hashed_password
+                """,
+                ("user_admin", "org_default", "role_admin", "admin@legalease.ai", seed_password_hash, "Enterprise Admin", 0)
+            )
 
-                await db.commit()
-                logger.info("Default organization, RBAC roles, and seed users initialized.")
+            # Upsert counsel user
+            await db.execute(
+                """
+                INSERT INTO users (id, organization_id, role_id, email, hashed_password, full_name, mfa_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(email) DO UPDATE SET hashed_password = excluded.hashed_password
+                """,
+                ("user_counsel", "org_default", "role_legal", "counsel@legalease.ai", seed_password_hash, "General Counsel", 0)
+            )
+
+            await db.commit()
+            logger.info("Default organization, RBAC roles, and seed users initialized/updated.")
+
 
 
 db_manager = DatabaseManager()
